@@ -154,7 +154,11 @@ PROMPT_SISTEMA = (
 
 def chamar_modelo(mensagens: list) -> dict:
     corpo = {"model": MODELO, "messages": mensagens, "tools": ESQUEMA_FERRAMENTAS}
-    cabecalho = {"Content-Type": "application/json"}
+    cabecalho = {
+        "Content-Type": "application/json",
+        # O Cloudflare na frente do Groq bloqueia o User-Agent padrão do urllib (erro 1010)
+        "User-Agent": "agente-nivel-1/1.0",
+    }
     if CONFIG["chave_env"]:
         chave = os.environ.get(CONFIG["chave_env"])
         if not chave:
@@ -213,10 +217,12 @@ def main():
             break
         if not pergunta:
             continue
+        tamanho_antes = len(mensagens)
         mensagens.append({"role": "user", "content": pergunta})
         try:
             print(f"Agente: {rodar_agente(mensagens)}\n")
-        except RuntimeError as e:
+        except (RuntimeError, OSError) as e:
+            del mensagens[tamanho_antes:]  # desfaz a rodada que falhou para não sujar o histórico
             print(f"⚠️  {e}\n")
 
 
