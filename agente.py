@@ -20,7 +20,7 @@ import operator
 import os
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import date, datetime
 
 # ---------------------------------------------------------------------------
 # 1. Configuração do provedor (todos falam o mesmo formato /chat/completions)
@@ -75,9 +75,21 @@ def calcular(expressao: str) -> str:
     return str(avaliar(ast.parse(expressao, mode="eval").body))
 
 
+DIAS_SEMANA = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
+               "sexta-feira", "sábado", "domingo"]
+
+
 def data_hora_atual() -> str:
-    """Devolve a data e a hora locais."""
-    return datetime.now().strftime("%A, %d/%m/%Y %H:%M")
+    """Devolve a data e a hora locais em formato ISO (sem ambiguidade dia/mês)."""
+    agora = datetime.now()
+    return f"{agora:%Y-%m-%d %H:%M} (formato ano-mês-dia), {DIAS_SEMANA[agora.weekday()]}"
+
+
+def dias_entre_datas(data_inicial: str, data_final: str) -> str:
+    """Conta quantos dias há entre duas datas no formato AAAA-MM-DD."""
+    inicio = date.fromisoformat(data_inicial)
+    fim = date.fromisoformat(data_final)
+    return f"{(fim - inicio).days} dias de {inicio} até {fim}"
 
 
 def buscar_wikipedia(termo: str) -> str:
@@ -102,6 +114,7 @@ def buscar_wikipedia(termo: str) -> str:
 FERRAMENTAS = {
     "calcular": calcular,
     "data_hora_atual": data_hora_atual,
+    "dias_entre_datas": dias_entre_datas,
     "buscar_wikipedia": buscar_wikipedia,
 }
 
@@ -123,8 +136,24 @@ ESQUEMA_FERRAMENTAS = [
         "type": "function",
         "function": {
             "name": "data_hora_atual",
-            "description": "Retorna a data e a hora atuais.",
+            "description": "Retorna a data e a hora atuais no formato AAAA-MM-DD HH:MM.",
             "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "dias_entre_datas",
+            "description": "Calcula quantos dias há entre duas datas. Use para qualquer pergunta "
+                           "do tipo 'quantos dias faltam' ou 'quantos dias se passaram'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data_inicial": {"type": "string", "description": "Formato AAAA-MM-DD"},
+                    "data_final": {"type": "string", "description": "Formato AAAA-MM-DD"},
+                },
+                "required": ["data_inicial", "data_final"],
+            },
         },
     },
     {
@@ -144,7 +173,10 @@ ESQUEMA_FERRAMENTAS = [
 PROMPT_SISTEMA = (
     "Você é um assistente prestativo que responde em português. "
     "Use as ferramentas disponíveis quando precisar de contas, da data atual "
-    "ou de informações factuais. Não invente resultados de ferramentas."
+    "ou de informações factuais. Não invente resultados de ferramentas. "
+    "Nunca faça contas de cabeça: use 'calcular' para números e 'dias_entre_datas' para datas. "
+    "Se uma ferramenta retornar ERRO, tente de outro jeito ou diga ao usuário que não conseguiu; "
+    "nunca responda com um valor que nenhuma ferramenta confirmou."
 )
 
 
